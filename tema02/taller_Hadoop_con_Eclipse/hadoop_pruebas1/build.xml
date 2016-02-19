@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- WARNING: Eclipse auto-generated file.
+              Any modifications will be overwritten.
+              To include a user specific buildfile here, simply create one in the same
+              directory with the processing instruction <?eclipse.ant.import?>
+              as the first entry and export the buildfile again. -->
+<project basedir="." default="main" name="hadoop_pruebas1">
+    <property environment="env"/>
+    <property name="debuglevel" value="source,lines,vars"/>
+    <property name="target" value="1.7"/>
+    <property name="source" value="1.7"/>
+	<property name="build.dir" value="build-ant"/>
+	<property name="pack.name" value="hadoop_pruebas1"/>
+	
+    <path id="classpath">
+        <fileset dir="/usr/local/hadoop/share/hadoop/common" includes="**/*.jar"/>
+    	<fileset dir="/usr/local/hadoop/share/hadoop/yarn" includes="**/*.jar"/>
+    	<fileset dir="/usr/local/hadoop/share/hadoop/mapreduce" includes="**/*.jar"/>
+    </path>    
+    
+    <target name="clean">
+        <delete dir="${build.dir}"/>
+    </target>
+
+    <target name="compile">
+        <mkdir dir="${build.dir}/classes"/>
+        <javac srcdir="src" destdir="${build.dir}/classes" classpathref="classpath"/>
+    </target>	
+    <target name="jar-file" depends="compile">
+        <mkdir dir="${build.dir}/jar"/>
+        <jar destfile="${build.dir}/jar/WordCount.jar" basedir="${build.dir}/classes">
+        	<manifest>
+        	    <attribute name="${pack.name}" value="WordCount"/>
+        	</manifest>
+        </jar>
+    </target>
+	
+	<target name="run" depends="jar-file">
+        <exec executable="echo">
+	    <arg value="All Set. Ready to run."/>
+	    </exec>
+    </target>
+    
+    <target name="clean-build" depends="clean,jar-file"/>
+    <target name="main" depends="clean,run"/>
+	
+    
+    <target description="Build all projects which reference this project. Useful to propagate changes." name="build-refprojects"/>
+</project>

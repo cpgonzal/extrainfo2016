@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- WARNING: Eclipse auto-generated file.
+              Any modifications will be overwritten.
+              To include a user specific buildfile here, simply create one in the same
+              directory with the processing instruction <?eclipse.ant.import?>
+              as the first entry and export the buildfile again. -->
+<project basedir="." default="main" name="hadoop_padron">
+    <property environment="env"/>
+    <property name="debuglevel" value="source,lines,vars"/>
+    <property name="target" value="1.7"/>
+    <property name="source" value="1.7"/>
+	
+    <path id="classpath">
+        <fileset dir="/usr/lib/hadoop/client" includes="**/*.jar"/>
+    </path>    
+    
+    <target name="clean">
+        <delete dir="build"/>
+    </target>
+
+    <target name="compile">
+        <mkdir dir="build/classes"/>
+        <javac srcdir="src" destdir="build/classes" classpathref="classpath"/>
+    </target>	
+    <target name="jar-padron" depends="compile">
+        <mkdir dir="build/jar"/>
+        <jar destfile="build/jar/EstadisticasRegistro.jar" basedir="build/classes">
+            <manifest>
+                <attribute name="Main-Class" value="EstadisticasRegistroDriver"/>
+            </manifest>
+        </jar>
+    </target>
+	
+	<target name="run" depends="jar-padron">
+        <exec executable="echo">
+	    <arg value="All Set. Ready to run."/>
+	    </exec>
+    </target>
+    
+    <target name="clean-build" depends="clean,jar-padron"/>
+    <target name="main" depends="clean,run"/>
+	
+    
+    <target description="Build all projects which reference this project. Useful to propagate changes." name="build-refprojects"/>
+</project>

@@ -1,0 +1,242 @@
+##
+## RHIPE
+##
+
+###### Configuración
+## pag. 67 Big Data Analytics with R and Hadoop
+
+
+## Downloading RHIPE package from RHIPE repository
+#wget http://ml.stat.purdue.edu/rhipebin/Rhipe_0.75.2_hadoop-2.tar.gz
+## Installing the RHIPE package in R via CMD command
+#R CMD INSTALL Rhipe_0.75.2_hadoop-2.tar.gz
+
+
+setwd("~/workspace/data")
+Sys.getenv("PKG_CONFIG_PATH")
+Sys.getenv("LD_LIBRARY_PATH")
+
+# configure /etc/Renviron.site
+Sys.getenv("HADOOP_HOME")
+Sys.getenv("HADOOP_BIN")
+Sys.getenv("HADOOP_CONF_DIR")
+Sys.getenv("HADOOP_LIBS")
+
+
+## Loading the RHIPE library
+library(Rhipe)
+## initializing the RHIPE subsystem, which is used for everything. RHIPE
+#will not work if rhinit is not called.
+rhinit()
+
+
+rhmkdir("/user/bigdata/R")
+hdfs.setwd("/user/bigdata/R")
+bashRhipeArchive("R.Pkg")
+
+#***********************************************************************
+#In the future use:
+#  rhoptions(zips = '/user/bigdata/R/R.Pkg.tar.gz')
+#  rhoptions(runner = 'sh ./R.Pkg/library/Rhipe/bin/RhipeMapReduce.sh')
+#Setting these options now.
+#***********************************************************************
+
+
+###### Veamos un test (sólo un map)
+
+#Defining the Map phase: The Map phase of this MapReduce program will call 10 different
+#iterations and in all of those iterations, random numbers from 1 to 10 will be
+#generated as per their iteration number. After that, the max and min values for that
+#generated numbers will be calculated.
+map<-function(k,v){
+  ## for generating the random deviates
+  x<-runif(v)
+  ## for emitting the key-value pairs with key – k and
+  ## value – min and max of generated random deviates.
+  rhcollect(k, c(Min=min(x),Max=max(x)))
+}
+
+#Output: Finally the output of the Map phase will be considered here as an output of
+#this MapReduce job and it will be stored to HDFS at ~/test.
+#Defining the MapReduce job by the rhwatch() method of the RHIPE package:
+## Create and running a MapReduce job by following
+job = rhwatch(map=map,input=10,reduce=0,
+              output="test",jobname="test")
+
+#Reading the MapReduce output from HDFS:
+## Read the results of job from HDFS
+result <- rhread('test')
+
+#For displaying the result in a more readable form in the table format, use the
+#following code:
+## Displaying the result
+outputdata <- do.call('rbind', lapply(result, "[[", 2))
+
+
+
+
+###### Veamos el análisis de datos de un archivo 
+
+getwd()
+rhls()
+rhput("alertas112_red.txt", "alertas112.txt")
+rhexists("alertas112_red.txt")
+
+map1 <- expression({
+  lapply(seq_along(map.keys), function(r) {
+    line = strsplit(map.values[[r]], ";")[[1]]
+    outputkey <- line[5:6]   # CODMUN, MUN112
+    outputvalue <- data.frame(
+      anio = as.character(line[1]),
+      minicio = as.character(line[2]),
+      mes = as.character(line[3]),
+      codsexo = as.character(line[4]),
+      stringsAsFactors = TRUE
+    )
+    rhcollect(outputkey, outputvalue)
+  })
+})
+
+reduce1 <- expression(
+  pre = {
+    reduceoutputvalue <- data.frame()
+  },
+  reduce = {
+    reduceoutputvalue <- rbind(reduceoutputvalue, do.call(rbind, reduce.values))
+  },
+  post = {
+    reduceoutputkey <- reduce.key[1]
+    attr(reduceoutputvalue, "location") <- reduce.key[1:2]
+    names(attr(reduceoutputvalue, "location")) <- c("cod_mun","mun")
+    rhcollect(reduceoutputkey, reduceoutputvalue)
+  }
+)
+
+
+mr1 <- rhwatch(
+  map      = map1,
+  reduce   = reduce1,
+  input    = rhfmt("alertas112.txt", type = "text"),
+  output   = rhfmt("alertas112_by_mun", type = "sequence"),
+  readback = FALSE
+)
+
+
+alertasSubsets <- rhread("alertas112_by_mun")
+alertasSubsets <- rhread("alertas112_by_mun", max = 10)
+head(alertasSubsets)
+keys <- unlist(lapply(alertasSubsets, "[[", 1))
+keys
+attributes(alertasSubsets[[1]][[2]])
+as.numeric(levels(alertasSubsets[[1]][[2]]$anio))
+
+
+
+map2 <- expression({
+  lapply(seq_along(map.keys), function(r) {
+    outputvalue <- data.frame(
+      cod_mun = map.keys[[r]],
+      mun = attr(map.values[[r]], "location")["mun"],
+      min_anio = min(as.numeric(levels(map.values[[r]]$anio)), na.rm = TRUE),
+      max_anio = max(as.numeric(levels(map.values[[r]]$anio)), na.rm = TRUE),
+      stringsAsFactors = FALSE
+    )
+    outputkey <- attr(map.values[[r]], "location")["cod_mun"]
+    rhcollect(outputkey, outputvalue)
+  })
+})
+
+reduce2 <- expression(
+  pre = {
+    reduceoutputvalue <- data.frame()
+  },
+  reduce = {
+    reduceoutputvalue <- rbind(reduceoutputvalue, do.call(rbind, reduce.values))
+  },
+  post = {
+    rhcollect(reduce.key, reduceoutputvalue)
+  }
+)
+
+mr2 <- rhwatch(
+  map      = map2,
+  reduce   = reduce2,
+  input    = rhfmt("alertas112_by_mun", type = "sequence"),
+  output   = rhfmt("alertas112_stats", type = "sequence"),
+  readback = TRUE
+)
+
+
+alertas112_stats<- rhread("alertas112_stats")
+head(alertas112_stats)
+keys <- unlist(lapply(alertas112_stats, "[[", 1))
+keys
+attributes(alertas112_stats[[1]][[2]])
+
+
+
+
+
+
+##
+## RHadoop
+##
+
+## pag. 77 Big Data Analytics with R and Hadoop
+
+##Loading rmr2 y rhdfs
+library(rmr2)
+library(rhdfs)
+hdfs.init()
+
+###### Veamos un test (sólo un map)
+ints = to.dfs(1:100)
+calc = mapreduce(input = ints, map = function(k, v) cbind(v, 2*v))
+test <- from.dfs(calc)
+test
+
+
+
+######Wordcount de RHadoop
+#http://blog.hsinfu.org/2015/04/01/ubuntu14-04linuxmint16-rhadoop-rmr2-plyrmr-rhdfs-rhbase-installation-on-hadoop-2-6-0/
+
+
+## map function
+map <- function(k,lines) {
+  words.list <- strsplit(lines, '\\s') 
+  words <- unlist(words.list)
+  return( keyval(words, 1) )
+}
+
+## reduce function
+reduce <- function(word, counts) { 
+  keyval(word, sum(counts))
+}
+
+wordcount <- function (input, output=NULL) { 
+  mapreduce(input=input, output=output, input.format="text", 
+            map=map, reduce=reduce)
+}
+
+
+## delete previous result if any
+system("/usr/local/hadoop/bin/hadoop fs -mkdir inputs/input2")
+system("/usr/local/hadoop/bin/hadoop fs -put texto.txt inputs/input2")
+system("/usr/local/hadoop/bin/hadoop fs -rm -r output")
+
+## Submit job
+hdfs.root <- '/user/hduser'
+hdfs.data <- file.path(hdfs.root, 'inputs/input2') 
+hdfs.out <- file.path(hdfs.root, 'output') 
+
+#hdfs.data <- file.path('/user/hduser/inputs/input2') 
+#hdfs.out <- file.path('/user/hduser/output') 
+out <- wordcount(hdfs.data, hdfs.out)
+
+## Fetch results from HDFS
+results <- from.dfs(out)
+
+## check top 30 frequent words
+results.df <- as.data.frame(results, stringsAsFactors=F) 
+colnames(results.df) <- c('word', 'count') 
+head(results.df[order(results.df$count, decreasing=T), ], 30)

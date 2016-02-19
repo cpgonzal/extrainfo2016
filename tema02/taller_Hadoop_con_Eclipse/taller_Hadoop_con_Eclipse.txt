@@ -1,0 +1,55 @@
+﻿##########En Java (lenguaje programación):
+
+hadoop_pruebas1: Versión de wordcount con la API de hadoop 2.0
+hadoop_pruebas2: Versión de wordcount con la API clásica (asistente de Eclipse de proyecto MapReduce)
+hadoop_pruebas3 Versión reducida de wordcount 
+
+#####Compilar con java:
+
+rm -r build-java
+mkdir build-java
+javac -classpath $HADOOP_HOME/share/hadoop/common/hadoop-common-2.6.0.jar:$HADOOP_HOME/share/hadoop/common/lib/hadoop-annotations-2.6.0.jar:$HADOOP_HOME/share/hadoop/mapreduce/hadoop-mapreduce-client-core-2.6.0.jar:$HADOOP_HOME/share/hadoop/common/lib/commons-cli-1.2.jar -sourcepath src -d build-java src/hadoop_pruebas1/*.java
+
+cd build-java
+mkdir jar
+jar cf jar/WordCount.jar hadoop_pruebas1/*.class
+
+#####Compilar con ant:
+rm -r build-ant
+ant -f build.xml main
+
+
+
+#####Ejecutar en hadoop
+cd hadoop_pruebas1
+
+hadoop fs -rm -r inputs/input1
+hadoop fs -rm -r output
+hadoop fs -mkdir inputs/input1
+hadoop fs -put input/sample.txt inputs/input1/
+hadoop jar build-ant/jar/WordCount.jar hadoop_pruebas1.WordCount inputs/input1 output
+hadoop fs -cat output/*
+
+NOTAS: En eclipse, se ejecuta el mapreduce por defecto tomando input y output de local
+Si se quiere tomar input y output de HDFS, hay que añadir la carpeta con los *.conf de hadoop al proyecto como librería enterna:
+http://stackoverflow.com/questions/7800591/accessing-hdfs-files-from-eclipse
+
+Además, hay que añadir la librería *.jar generada al proyecto antes de la ejecución
+
+
+##########En Python (intérprete):
+python_pruebas1: Versión de mapreduce con mrjob
+python_pruebas2: Versión de mapreduce con Python streaming
+http://www.michael-noll.com/tutorials/writing-an-hadoop-mapreduce-program-in-python/
+
+
+#####Ejecutar en hadoop
+echo "foo foo quux labs foo bar quux" | python mapper.py
+echo "foo foo quux labs foo bar quux" | python mapper.py | sort -k1,1 | python reducer.py
+
+hadoop jar $HADOOP_HOME/share/hadoop/tools/lib/hadoop-streaming-2.6.0.jar \
+-file mapper.py    -mapper mapper.py \
+-file reducer.py   -reducer reducer.py \
+-input inputs/input3/* -output output
+
+
